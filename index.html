@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revenue Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --paper:#eef1f4; --panel:#ffffff; --ink:#13233a; --muted:#5d6b7e; --line:#d9dfe6; --soft:#e4e9ef;
+  --gold:#b8862a; --closed:#13233a; --commit:#2f6f8f; --best:#8fb3c7; --pipe:#c9d4de;
+  --good:#1f7a4d; --warn:#b36b0e; --bad:#b42318;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e1a2b; --panel:#14243a; --ink:#e7ecf2; --muted:#93a3b8; --line:#253751; --soft:#1c2f48;
+    --gold:#e0b04f; --closed:#e7ecf2; --commit:#5fa8cc; --best:#3d6d88; --pipe:#2a4260;
+    --good:#4cc38a; --warn:#f0a53a; --bad:#f26d5f;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e1a2b; --panel:#14243a; --ink:#e7ecf2; --muted:#93a3b8; --line:#253751; --soft:#1c2f48;
+  --gold:#e0b04f; --closed:#e7ecf2; --commit:#5fa8cc; --best:#3d6d88; --pipe:#2a4260;
+  --good:#4cc38a; --warn:#f0a53a; --bad:#f26d5f;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 18px 56px}
+h1,h2,.big,.metric b{font-family:"Archivo","Arial Narrow",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+h1{font-size:22px;font-weight:700;font-stretch:85%;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13.5px;margin:2px 0 0}
+header{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;align-items:flex-end;margin-bottom:10px}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);display:flex;gap:26px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto;scrollbar-width:none}
+.tabs button{border:0;background:none;font:inherit;font-weight:600;font-size:15px;color:var(--muted);padding:13px 2px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold)}
+.tabs button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+[role="tabpanel"]>section:last-child,[role="tabpanel"]>.grid:last-child{margin-bottom:0!important}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);padding:8px 12px;font:inherit;font-size:13.5px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+select{font:inherit;font-size:13.5px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);max-width:100%}
+button:focus-visible,select:focus-visible,tr:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* Hero: forecast */
+.hero{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 26px 22px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:32px;align-items:center}
+@media (max-width:820px){.hero{grid-template-columns:1fr;gap:20px;padding:20px}}
+.big{font-size:clamp(38px,6vw,64px);font-weight:800;font-stretch:72%;line-height:.95;margin:0;letter-spacing:-.02em}
+.big small{display:block;font-size:.42em;font-weight:500;font-stretch:90%;color:var(--muted);margin-top:8px;letter-spacing:0}
+.insight{margin:16px 0 0;font-size:14.5px;max-width:52ch}
+.insight p{margin:0 0 8px}
+.flag{color:var(--bad);font-weight:600}
+.ladder{position:relative;padding-top:22px}
+.lrow{display:grid;grid-template-columns:96px minmax(0,1fr) 118px;align-items:center;gap:12px;margin:12px 0}
+.lrow .lab{font-size:13.5px;font-weight:600}
+.lrow .val{text-align:right;font-variant-numeric:tabular-nums;font-size:13.5px}
+.lrow .val span{color:var(--muted);font-size:12.5px;margin-left:4px}
+.track{position:relative;height:26px;background:var(--soft);border-radius:4px}
+.fill{height:100%;border-radius:4px;transition:width .5s ease}
+.qline{position:absolute;top:22px;bottom:0;width:0;border-left:2px dashed var(--gold);pointer-events:none}
+.qtag{position:absolute;top:0;transform:translateX(-50%);font-size:12px;font-weight:600;color:var(--gold);white-space:nowrap}
+@media (max-width:520px){.lrow{grid-template-columns:72px minmax(0,1fr);}.lrow .val{grid-column:2;text-align:left;margin-top:-8px}}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+
+/* Metric strip */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:18px 0 26px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.metric{padding:14px 16px;border-right:1px solid var(--line)}
+.metric:last-child{border-right:0}
+.metric span{display:block;font-size:13px;color:var(--muted)}
+.metric b{display:block;font-size:28px;font-weight:700;font-stretch:80%;margin:2px 0}
+.metric em{font-style:normal;font-size:12.5px;color:var(--muted)}
+.good{color:var(--good)!important}.warn{color:var(--warn)!important}.bad{color:var(--bad)!important}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 18px 16px;min-width:0}
+.panel h2{font-size:17px;font-weight:700;font-stretch:88%;margin:0}
+.panel .hint{font-size:13px;color:var(--muted);margin:2px 0 14px}
+.chartbox{position:relative;height:250px}
+.twin{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:560px){.twin{grid-template-columns:1fr}}
+.twin h3{font-size:13px;font-weight:600;margin:0 0 6px;color:var(--muted)}
+.twin .chartbox{height:210px}
+
+.scroll{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:12.5px;border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.r{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr.pick{cursor:pointer}
+tbody tr.pick:hover{background:var(--soft)}
+tbody tr.sel{background:var(--soft);box-shadow:inset 3px 0 0 var(--gold)}
+.att{display:flex;align-items:center;gap:8px}
+.att .bar{width:84px;height:6px;background:var(--soft);border-radius:3px;overflow:hidden}
+.att .bar i{display:block;height:100%}
+.badge{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;display:inline-block}
+.badge.high{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.badge.med{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.empty{padding:22px 10px;color:var(--muted);text-align:center}
+.dstrip{margin:0 0 18px}
+.funnel{min-width:660px;margin-bottom:14px}
+.fname{font-size:13px;font-weight:600;margin-bottom:6px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(88px,1fr) 46px) minmax(88px,1fr);align-items:center}
+.step{background:var(--soft);border-radius:6px;padding:8px 10px}
+.step b{display:block;font-family:"Archivo","Arial Narrow",sans-serif;font-stretch:80%;font-size:22px;font-variant-numeric:tabular-nums}
+.step span{font-size:12px;color:var(--muted)}
+.step.skip{background:transparent;border:1px dashed var(--line)}
+.conv{text-align:center;font-size:12.5px;font-weight:600;color:var(--commit)}
+.chartbox.tall{height:320px;margin:6px 0 18px}
+tr.tot td{font-weight:600;border-top:2px solid var(--line)}
+h3.sec{font-family:"Archivo","Arial Narrow",sans-serif;font-stretch:88%;font-size:16px;font-weight:700;margin:30px 0 2px;padding-top:20px;border-top:1px solid var(--line)}
+.nn{color:var(--muted);font-size:11.5px;margin-left:5px}
+.lead{font-family:"Archivo","Arial Narrow",sans-serif;font-stretch:88%;font-size:clamp(17px,2.2vw,20px);font-weight:600;line-height:1.3;margin:0 0 16px;padding-left:12px;border-left:3px solid var(--gold);max-width:70ch}
+.more{margin-top:24px;width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.more .chev{transition:transform .2s ease}
+.more[aria-expanded="true"] .chev{transform:rotate(180deg)}
+@media (prefers-reduced-motion:reduce){.more .chev{transition:none}}
+#infWrap h3.sec{border-top:0;padding-top:0;margin-top:18px}
+.badge.hero{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+.badge.ok{background:color-mix(in srgb,var(--commit) 16%,transparent);color:var(--commit)}
+.heroline{font-size:14.5px;margin:0 0 14px;max-width:80ch}
+.heroline p{margin:0 0 6px}
+footer{color:var(--muted);font-size:12.5px;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Revenue Command Center</h1>
+      <p class="sub">Northwind Data, Q3 2026. Sample data as of Sep 23.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Team">
+        <button data-team="All" aria-pressed="true">All teams</button>
+        <button data-team="Enterprise" aria-pressed="false">Enterprise</button>
+        <button data-team="Mid-Market" aria-pressed="false">Mid-Market</button>
+      </div>
+      <select id="rep" aria-label="Rep"></select>
+      <select id="stale" aria-label="Quiet deal threshold">
+        <option value="7">Quiet after 7 days</option>
+        <option value="14" selected>Quiet after 14 days</option>
+        <option value="21">Quiet after 21 days</option>
+        <option value="30">Quiet after 30 days</option>
+      </select>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+    <button role="tab" id="t-forecast" aria-controls="tab-forecast" aria-selected="true">Forecast</button>
+    <button role="tab" id="t-team" aria-controls="tab-team" aria-selected="false" tabindex="-1">Team</button>
+    <button role="tab" id="t-pipeline" aria-controls="tab-pipeline" aria-selected="false" tabindex="-1">Pipeline</button>
+    <button role="tab" id="t-demand" aria-controls="tab-demand" aria-selected="false" tabindex="-1">Demand</button>
+    <button role="tab" id="t-partners" aria-controls="tab-partners" aria-selected="false" tabindex="-1">Partners</button>
+    <button role="tab" id="t-ai" aria-controls="tab-ai" aria-selected="false" tabindex="-1">AI adoption</button>
+  </nav>
+
+  <div role="tabpanel" id="tab-forecast" aria-labelledby="t-forecast">
+  <p class="lead">Will we hit the number this quarter, and how much of the forecast can we trust?</p>
+  <section class="hero" aria-label="Quarter forecast">
+    <div>
+      <p class="big" id="heroBig"></p>
+      <div class="insight" id="insight"></div>
+    </div>
+    <div class="ladder" id="ladder"></div>
+  </section>
+
+  <section class="strip" id="strip" aria-label="Key metrics"></section>
+
+  </div>
+
+  <div role="tabpanel" id="tab-pipeline" aria-labelledby="t-pipeline" hidden>
+  <p class="lead">Is there enough pipeline for next quarter, and which deals are going stale?</p>
+  <div class="grid">
+    <section class="panel">
+      <h2>Pipeline by stage</h2>
+      <p class="hint">Open deals closing this quarter and next.</p>
+      <div class="chartbox"><canvas id="stageChart" aria-label="Pipeline by stage chart"></canvas></div>
+    </section>
+    <section class="panel">
+      <h2>Win rate and sales cycle</h2>
+      <p class="hint">Last six quarters by team. This quarter is to date.</p>
+      <div class="twin">
+        <div><h3>Win rate</h3><div class="chartbox"><canvas id="winChart" aria-label="Win rate trend"></canvas></div></div>
+        <div><h3>Days to close</h3><div class="chartbox"><canvas id="cycleChart" aria-label="Sales cycle trend"></canvas></div></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2 id="quietTitle">Deals gone quiet</h2>
+    <p class="hint">Open deals with no update past the threshold, ranked by dollars at risk. Deals forecast to close this quarter rank highest.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Account</th><th>Owner</th><th>Stage</th><th>Forecast</th><th class="r">Amount</th><th>Close date</th><th class="r">Days since update</th><th class="r">Days in stage</th><th>Risk</th></tr></thead>
+      <tbody id="quietBody"></tbody>
+    </table></div>
+  </section>
+
+  </div>
+
+  <div role="tabpanel" id="tab-demand" aria-labelledby="t-demand" hidden>
+  <p class="lead">Which marketing channels create revenue, and what does each one cost?</p>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>Demand and lead sources</h2>
+    <p class="hint">Where pipeline comes from and what it costs this quarter. Follows the team filter; lead data isn't tracked per rep. Partner and co-sell deals are on the Partners tab.</p>
+    <div class="strip dstrip" id="dstrip"></div>
+    <div class="scroll"><div id="funnels"></div></div>
+    <div class="chartbox tall"><canvas id="sourceChart" aria-label="Revenue and pipeline by source"></canvas></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Source</th><th>Type</th><th class="r">Spend</th><th class="r">Leads</th><th class="r">MQLs</th><th class="r">SQLs</th><th class="r">Opps</th><th class="r">Pipeline created</th><th class="r">Won</th><th class="r">Cost per lead</th><th class="r">Cost per opp</th><th class="r">CAC</th><th class="r">Return</th></tr></thead>
+      <tbody id="srcBody"></tbody>
+    </table></div>
+
+    <button class="more" id="infToggle" aria-expanded="false" aria-controls="infWrap"><span class="lbl">Show sourced vs influenced</span><span class="chev" aria-hidden="true">▾</span></button>
+    <div id="infWrap" hidden>
+    <h3 class="sec">Sourced vs influenced</h3>
+    <p class="hint">Sourced means the channel created the deal. Influenced means the buyer engaged with it after the deal was already open, like an Enterprise prospect attending re:Invent mid-cycle. One deal can be influenced by several channels, so influenced totals overlap and shouldn't be added up.</p>
+    <div class="strip dstrip" id="istrip"></div>
+    <div class="chartbox tall"><canvas id="infChart" aria-label="Sourced versus influenced pipeline by channel"></canvas></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Channel</th><th class="r">Sourced pipeline</th><th class="r">Influenced deals</th><th class="r">Influenced pipeline</th><th class="r">Influenced won</th><th class="r">Win rate when touched</th><th class="r">Without touch</th><th class="r">Lift</th></tr></thead>
+      <tbody id="infBody"></tbody>
+    </table></div>
+    </div>
+  </section>
+
+  </div>
+
+  <div role="tabpanel" id="tab-team" aria-labelledby="t-team" hidden>
+  <p class="lead">Who's getting us to the number, and whose CRM data can we trust?</p>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>Rep performance</h2>
+    <p class="hint">Select a rep to focus the whole dashboard on them. Select again to clear.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Rep</th><th>Team</th><th class="r">Quota</th><th class="r">Closed</th><th>Attainment</th><th class="r">Commit</th><th class="r">Next-qtr coverage</th><th class="r">Win rate</th><th class="r">Quiet deals</th><th>CRM hygiene</th></tr></thead>
+      <tbody id="repBody"></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel" style="margin-bottom:18px">
+    <h2>CRM hygiene</h2>
+    <p class="hint">Who keeps deal data trustworthy, and who needs more time in the CRM. This scores the quality of deal records, not activity volume, so it can't be gamed by logging busywork. Follows the team filter.</p>
+    <div class="heroline" id="hyHero"></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Rep</th><th>Score</th><th class="r">Updated in 14 days</th><th class="r">Next step set</th><th class="r">Close date valid</th><th class="r">Pushed once or less</th><th class="r">MEDDICC complete</th><th>Status</th></tr></thead>
+      <tbody id="hyBody"></tbody>
+    </table></div>
+    <p class="hint" style="margin:12px 0 0">Score weights: freshness 25%, next steps 20%, valid close dates 20%, pushes 15%, MEDDICC fields on Proposal and Negotiation deals 20%. Hero is 85 and up; under 70 needs coaching.</p>
+  </section>
+
+  </div>
+
+  <div role="tabpanel" id="tab-ai" aria-labelledby="t-ai" hidden>
+  <p class="lead">Are reps using the AI tools, and is it improving results?</p>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>AI adoption and impact</h2>
+    <p class="hint">Are sellers using the AI tools, and is it changing results? Follows the team and rep filters.</p>
+    <div class="strip dstrip" id="aistrip"></div>
+    <div class="heroline" id="aiRead"></div>
+  </section>
+  <div class="grid">
+    <section class="panel">
+      <h2>Adoption since rollout</h2>
+      <p class="hint">Average weekly active use by team over the 12 weeks since launch.</p>
+      <div class="chartbox"><canvas id="aiTrend" aria-label="Adoption trend since rollout"></canvas></div>
+    </section>
+    <section class="panel">
+      <h2>Coaching map</h2>
+      <p class="hint">Adoption vs quota attainment. Top right are champions; bottom left need the most help.</p>
+      <div class="chartbox"><canvas id="aiMap" aria-label="Adoption versus attainment by rep"></canvas></div>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>Adoption by rep</h2>
+    <p class="hint">Each rep's usage next to their results, with a suggested next move. Select a rep to focus the dashboard on them.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Rep</th><th class="r">Weekly use</th><th class="r">AI-prepped deals</th><th class="r">Meeting preps per week</th><th class="r">Attainment</th><th class="r">CRM hygiene</th><th>Stage</th><th>Next move</th></tr></thead>
+      <tbody id="aiBody"></tbody>
+    </table></div>
+  </section>
+  </div>
+
+  <div role="tabpanel" id="tab-partners" aria-labelledby="t-partners" hidden>
+  <p class="lead">How much revenue is coming through AWS, Microsoft, Google Cloud, and SI partners?</p>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>Channel, partners and co-sell</h2>
+    <p class="hint">Deals co-sold with hyperscalers (AWS, Microsoft, Google Cloud), transacted through cloud marketplaces, or referred by systems integrators. Follows the team and rep filters.</p>
+    <div class="strip dstrip" id="pstrip"></div>
+    <div class="heroline" id="pRead"></div>
+  </section>
+  <div class="grid">
+    <section class="panel">
+      <h2>Open pipeline by partner</h2>
+      <p class="hint">Split by how the partner is involved.</p>
+      <div class="chartbox"><canvas id="pChart" aria-label="Open partner pipeline by partner and motion"></canvas></div>
+    </section>
+    <section class="panel">
+      <h2>Partner vs direct</h2>
+      <p class="hint">How partner deals compare with deals the team sources alone.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Measure</th><th class="r">Partner</th><th class="r">Direct</th></tr></thead>
+        <tbody id="pVs"></tbody>
+      </table></div>
+    </section>
+  </div>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>Partner scorecard</h2>
+    <p class="hint">Each partner and motion, ranked by open pipeline.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Partner</th><th>Motion</th><th class="r">Open pipeline</th><th class="r">Open deals</th><th class="r">Closing this quarter</th><th class="r">Won this quarter</th><th class="r">Pending registration</th><th class="r">Counts toward cloud commit</th></tr></thead>
+      <tbody id="pScore"></tbody>
+    </table></div>
+  </section>
+  <section class="panel">
+    <h2 id="pDealsTitle">Open partner deals</h2>
+    <p class="hint">Largest first. Pending registration means the partner hasn't approved the deal yet, so their field team may not engage.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Account</th><th>Partner</th><th>Motion</th><th>Owner</th><th>Stage</th><th>Forecast</th><th class="r">Amount</th><th>Close date</th><th>Registration</th><th>Cloud commit</th></tr></thead>
+      <tbody id="pDeals"></tbody>
+    </table></div>
+  </section>
+  </div>
+
+  <footer>Demo dashboard with generated sample data. No real customer information.</footer>
+</div>
+
+<script>
+/* ---------- Sample data (seeded so it's the same every load) ---------- */
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(20260923);
+const rnd=(a,b)=>a+R()*(b-a);
+const ri=(a,b)=>Math.floor(rnd(a,b+1));
+const pick=a=>a[Math.floor(R()*a.length)];
+
+const DAYS_LEFT=7;
+const STAGES=["Discovery","Qualification","Solution","Proposal","Negotiation"];
+const PFX=["Apex","Blue Harbor","Cedar","Summit","Ironwood","Northstar","Pacific","Redline","Silverline","Vantage","Keystone","Meridian","Orbit","Granite","Lumen","Crescent","Evergreen","Sierra","Atlas","Bayview"];
+const SFX=["Health","Logistics","Financial","Energy","Retail","Systems","Labs","Foods","Insurance","Manufacturing","Media","Credit Union"];
+const REPS=[
+  {name:"Maya Chen",team:"Enterprise",quota:850000,f:1.02},
+  {name:"Daniel Ortiz",team:"Enterprise",quota:850000,f:0.78},
+  {name:"Priya Nair",team:"Enterprise",quota:850000,f:0.61},
+  {name:"Marcus Bell",team:"Enterprise",quota:850000,f:0.44},
+  {name:"Sofia Ramirez",team:"Mid-Market",quota:400000,f:0.93},
+  {name:"Tyler Brooks",team:"Mid-Market",quota:400000,f:0.71},
+  {name:"Aisha Khan",team:"Mid-Market",quota:400000,f:0.83},
+  {name:"Ben Walsh",team:"Mid-Market",quota:400000,f:0.52}
+];
+const deals=[];let uid=0;
+function mk(rep,o){
+  const amt=rep.team==="Enterprise"?Math.round(rnd(60,260))*1000:Math.round(rnd(18,95))*1000;
+  return Object.assign({id:++uid,account:pick(PFX)+" "+pick(SFX),owner:rep.name,team:rep.team,amount:amt},o);
+}
+function openDeal(rep,o,slow){
+  const upd=R()<0.68?ri(0,9):Math.round(ri(11,45)*slow);
+  const u=Math.min(upd,90);
+  return mk(rep,Object.assign({status:"Open",updated:u,inStage:Math.min(u+ri(3,40),120)},o));
+}
+REPS.forEach(rep=>{
+  const ent=rep.team==="Enterprise";
+  const slow=(rep.name==="Marcus Bell"||rep.name==="Ben Walsh")?1.8:1;
+  let s=0;const target=rep.f*rep.quota;
+  while(s<target*0.97){
+    const d=mk(rep,{status:"Won",qtr:"cur",cycle:ent?ri(70,160):ri(30,85)});
+    if(s+d.amount>target*1.04)d.amount=Math.max(10000,Math.round((target-s)/1000)*1000);
+    s+=d.amount;deals.push(d);
+  }
+  for(let i=ri(6,11);i>0;i--)deals.push(mk(rep,{status:"Lost",qtr:"cur",cycle:ent?ri(60,150):ri(25,80)}));
+  for(let i=ri(4,7);i>0;i--){
+    const stage=pick(["Qualification","Solution","Proposal","Proposal","Negotiation","Negotiation"]);
+    let fc;
+    if(stage==="Negotiation")fc=R()<0.5?"Commit":"Best Case";
+    else if(stage==="Proposal"){const r=R();fc=r<0.08?"Commit":r<0.6?"Best Case":"Pipeline";}
+    else fc=R()<0.3?"Best Case":"Pipeline";
+    deals.push(openDeal(rep,{qtr:"cur",stage,forecast:fc,close:new Date(2026,8,ri(24,30))},slow));
+  }
+  for(let i=ent?ri(12,18):ri(14,22);i>0;i--){
+    const stage=pick(["Discovery","Discovery","Qualification","Qualification","Solution","Proposal","Negotiation"]);
+    deals.push(openDeal(rep,{qtr:"next",stage,forecast:"Pipeline",close:new Date(2026,ri(9,11),ri(1,28))},slow));
+  }
+});
+const QTRS=["Q2 '25","Q3 '25","Q4 '25","Q1 '26","Q2 '26","Q3 '26"];
+const HIST={
+  "Enterprise":{win:[.31,.33,.32,.35,.34],cycle:[128,124,121,118,116]},
+  "Mid-Market":{win:[.36,.35,.38,.40,.39],cycle:[66,64,62,60,58]}
+};
+
+/* ---------- Helpers ---------- */
+const $=s=>document.querySelector(s);
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const amt=a=>sum(a.map(d=>d.amount));
+const fmt=n=>{const a=Math.abs(n);if(a>=1e6)return "$"+(n/1e6).toFixed(2)+"M";if(a>=1e4)return "$"+Math.round(n/1e3)+"K";return "$"+Math.round(n).toLocaleString("en-US")};
+const n=x=>x.toLocaleString("en-US");
+
+/* ---------- Lead sources (separate seed so the deal data stays the same) ---------- */
+const TEAMS=["Enterprise","Mid-Market"];
+const SOURCES=[
+  {key:"Snowflake Summit",type:"Event",spend:[145000,45000],w:[14,5]},
+  {key:"Dreamforce",type:"Event",spend:[160000,70000],w:[12,8]},
+  {key:"AWS re:Invent",type:"Event",spend:[210000,60000],w:[16,6]},
+  {key:"Webinars",type:"Content",spend:[24000,28000],w:[8,15]},
+  {key:"Blog and SEO",type:"Content",spend:[18000,22000],w:[5,12]},
+  {key:"LinkedIn and social",type:"Social",spend:[55000,65000],w:[8,14]},
+  {key:"Website demo requests",type:"Inbound",spend:[40000,60000],w:[10,20]},
+  {key:"SDR outbound",type:"Outbound",spend:[180000,140000],w:[27,20]}
+];
+const R2=rng(777);
+deals.forEach(d=>{
+  const ti=TEAMS.indexOf(d.team);let x=R2()*SOURCES.reduce((a,s)=>a+s.w[ti],0);
+  d.source=SOURCES[SOURCES.length-1].key;
+  for(const s of SOURCES){x-=s.w[ti];if(x<=0){d.source=s.key;break;}}
+});
+SOURCES.forEach(s=>{
+  s.out=s.type==="Outbound";
+  s.rates=TEAMS.map(()=>({opp:.5+R2()*.25,sql:s.out?.04+R2()*.03:.3+R2()*.18,mql:s.type==="Event"?.18+R2()*.12:.08+R2()*.12}));
+});
+/* Marketing touches after a deal opened (own seed). Won deals get touched a bit more often, as in real data. */
+const R3=rng(4242);
+const TOUCH={"Snowflake Summit":[.09,.04],"Dreamforce":[.10,.05],"AWS re:Invent":[.11,.04],"Webinars":[.08,.11],"Blog and SEO":[.06,.08],"LinkedIn and social":[.10,.12],"Website demo requests":[.03,.04]};
+deals.forEach(d=>{
+  const ti=TEAMS.indexOf(d.team),k=d.status==="Won"?1.2:d.status==="Lost"?.9:1;
+  d.touches=Object.keys(TOUCH).filter(s=>{const hit=R3()<TOUCH[s][ti]*k;return hit&&s!==d.source;});
+});
+/* CRM hygiene fields on open deals, driven by each rep's discipline (own seed) */
+const R4=rng(9090);const ri4=(a,b)=>a+Math.floor(R4()*(b-a+1));
+const TODAY=new Date(2026,8,23);
+const DISC={"Maya Chen":.9,"Daniel Ortiz":.72,"Priya Nair":.8,"Marcus Bell":.42,"Sofia Ramirez":.85,"Tyler Brooks":.62,"Aisha Khan":.96,"Ben Walsh":.5};
+deals.filter(d=>d.status==="Open").forEach(d=>{
+  const q=DISC[d.owner];
+  d.nextStep=R4()<(d.updated>=21?q*.6:q*.95+.05);
+  if(R4()<(1-q)*.35)d.close=new Date(2026,ri4(6,8),ri4(1,20));
+  d.pushes=R4()<(1-q)*.9?1+Math.floor(R4()*3):0;
+  d.med=Math.max(0,Math.min(6,Math.round(6*(q*.75+R4()*.3))));
+});
+const HY={};
+function computeHY(){REPS.forEach(r=>{
+  const o=deals.filter(d=>d.owner===r.name&&d.status==="Open");
+  const late=o.filter(d=>d.stage==="Proposal"||d.stage==="Negotiation");
+  const share=f=>o.length?o.filter(f).length/o.length:1;
+  const p={fresh:share(d=>d.updated<14),next:share(d=>d.nextStep),close:share(d=>d.close>=TODAY),push:share(d=>d.pushes<=1),med:late.length?late.reduce((a,d)=>a+d.med,0)/(late.length*6):1};
+  HY[r.name]={p,o,score:Math.round(100*(p.fresh*.25+p.next*.2+p.close*.2+p.push*.15+p.med*.2)),
+    pastClose:o.filter(d=>d.close<TODAY).length,noNext:o.filter(d=>!d.nextStep).length,pushed:o.filter(d=>d.pushes>=2).length};
+});}
+computeHY();
+/* AI usage (own seed). Reps lean on AI for bigger deals, which builds in the selection bias real data has. */
+const R5=rng(5150);
+const ADOPT={"Maya Chen":.84,"Daniel Ortiz":.46,"Priya Nair":.72,"Marcus Bell":.18,"Sofia Ramirez":.66,"Tyler Brooks":.58,"Aisha Khan":.9,"Ben Walsh":.31};
+const MEDIAN={};
+TEAMS.forEach(t=>{const a=deals.filter(d=>d.team===t).map(d=>d.amount).sort((x,y)=>x-y);MEDIAN[t]=a[Math.floor(a.length/2)];});
+deals.forEach(d=>{let p=ADOPT[d.owner]*.85;p*=d.amount>MEDIAN[d.team]?1.35:.7;if(d.status==="Won")p*=1.15;if(d.status==="Lost")p*=.9;d.ai=R5()<Math.min(p,.97);});
+const PREPS={};REPS.forEach(r=>PREPS[r.name]=Math.max(0,Math.round(ADOPT[r.name]*9+R5()*2-1)));
+function aiSplit(ds){
+  const g=f=>{const a=ds.filter(f),w=a.filter(d=>d.status==="Won"),c=a.filter(d=>d.status!=="Open");
+    return {n:a.length,nc:c.length,nw:w.length,win:c.length?w.length/c.length:0,size:w.length?amt(w)/w.length:0,cyc:w.length?w.reduce((x,d)=>x+d.cycle,0)/w.length:0};};
+  return {ai:g(d=>d.ai),no:g(d=>!d.ai),share:ds.length?ds.filter(d=>d.ai).length/ds.length:0};
+}
+/* Channel, partner and hyperscaler co-sell deals (own seed, added last so other data stays stable) */
+const R6=rng(3030);const r6=(a,b)=>a+R6()*(b-a);const ri6=(a,b)=>a+Math.floor(R6()*(b-a+1));const pick6=a=>a[Math.floor(R6()*a.length)];
+const PARTNERS=[
+  {partner:"AWS",motion:"Co-sell",hs:true,w:18},
+  {partner:"Microsoft",motion:"Co-sell",hs:true,w:20},
+  {partner:"Google Cloud",motion:"Co-sell",hs:true,w:10},
+  {partner:"AWS",motion:"Marketplace",hs:true,w:12},
+  {partner:"Microsoft",motion:"Marketplace",hs:true,w:12},
+  {partner:"Accenture",motion:"SI referral",hs:false,w:12},
+  {partner:"Deloitte",motion:"SI referral",hs:false,w:9},
+  {partner:"Slalom",motion:"SI referral",hs:false,w:7}
+];
+function pickPartner(){let x=R6()*PARTNERS.reduce((a,p)=>a+p.w,0);for(const p of PARTNERS){x-=p.w;if(x<=0)return p;}return PARTNERS[0];}
+function partnerDeal(o){
+  const ent=R6()<.75,rep=pick6(REPS.filter(r=>r.team===(ent?"Enterprise":"Mid-Market"))),p=pickPartner();
+  const amount=Math.round(ent?r6(120,380):r6(45,140))*1000;
+  const d=Object.assign({id:++uid,account:pick6(PFX)+" "+pick6(SFX),owner:rep.name,team:rep.team,amount,source:"Partner",touches:[],
+    partner:p.partner,motion:p.motion,hs:p.hs,registered:R6()<.75,commitBurn:p.motion==="Marketplace"||(p.hs&&R6()<.45)},o);
+  if(d.status==="Open"){d.updated=R6()<.8?ri6(0,10):ri6(14,30);d.inStage=d.updated+ri6(3,25);d.nextStep=R6()<.85;d.pushes=R6()<.2?1:0;d.med=ri6(3,6);}
+  else d.cycle=ent?ri6(60,140):ri6(35,80);
+  d.ai=R6()<ADOPT[d.owner]*.9;
+  return d;
+}
+const partnerDeals=[];
+for(let i=0;i<3;i++)partnerDeals.push(partnerDeal({status:"Won",qtr:"cur"}));
+for(let i=0;i<2;i++)partnerDeals.push(partnerDeal({status:"Lost",qtr:"cur"}));
+let pOpen=0;
+while(pOpen<2950000){
+  const cur=R6()<.3;
+  const stage=cur?pick6(["Proposal","Negotiation","Negotiation"]):pick6(["Discovery","Qualification","Solution","Solution","Proposal"]);
+  const fc=cur?(stage==="Negotiation"?(R6()<.4?"Commit":"Best Case"):"Best Case"):"Pipeline";
+  const d=partnerDeal({status:"Open",qtr:cur?"cur":"next",stage,forecast:fc,close:cur?new Date(2026,8,ri6(24,30)):new Date(2026,ri6(9,11),ri6(1,28))});
+  partnerDeals.push(d);pOpen+=d.amount;
+}
+deals.push(...partnerDeals);
+computeHY();
+const aiStage=a=>a>=.7?["hero","Champion"]:a>=.4?["ok","Developing"]:["high","Not adopted"];
+const hyStatus=s=>s>=85?["hero","CRM hero"]:s>=70?["ok","Solid"]:["high","Needs coaching"];
+function influence(){
+  const teams=state.team==="All"?TEAMS:[state.team];
+  const ds=deals.filter(d=>teams.includes(d.team));
+  const wr=a=>{const c=a.filter(d=>d.status!=="Open");return {r:c.length?c.filter(d=>d.status==="Won").length/c.length:0,n:c.length};};
+  const rows=SOURCES.filter(s=>!s.out).map(s=>{
+    const hitBy=d=>d.source===s.key||d.touches.includes(s.key);
+    const inf=ds.filter(d=>d.touches.includes(s.key));
+    return {key:s.key,sourced:amt(ds.filter(d=>d.source===s.key)),infN:inf.length,inf:amt(inf),
+      infWon:amt(inf.filter(d=>d.status==="Won")),t:wr(ds.filter(hitBy)),u:wr(ds.filter(d=>!hitBy(d)))};
+  });
+  const any=ds.filter(d=>d.touches.length);
+  return {rows,ds,any,wA:wr(any),wN:wr(ds.filter(d=>!d.touches.length))};
+}
+function demand(){
+  const teams=state.team==="All"?TEAMS:[state.team];
+  return SOURCES.map(s=>{
+    const r={key:s.key,type:s.type,out:s.out,spend:0,leads:0,mql:0,sql:0,opps:0,pipe:0,won:0,wonN:0,open:0};
+    teams.forEach(t=>{
+      const ti=TEAMS.indexOf(t),rt=s.rates[ti];
+      const ds=deals.filter(d=>d.team===t&&d.source===s.key);
+      const won=ds.filter(d=>d.status==="Won");
+      const sql=Math.round(ds.length/rt.opp);
+      const mql=s.out?0:Math.round(sql/rt.sql);
+      r.spend+=s.spend[ti];r.sql+=sql;r.mql+=mql;r.opps+=ds.length;
+      r.leads+=s.out?Math.round(sql/rt.sql):Math.round(mql/rt.mql);
+      r.pipe+=amt(ds);r.won+=amt(won);r.wonN+=won.length;r.open+=amt(ds.filter(d=>d.status==="Open"));
+    });
+    return r;
+  });
+}
+const pct=n=>Math.round(n*100)+"%";
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fdate=d=>d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+const tone=(v,g,w)=>v>=g?"good":v>=w?"warn":"bad";
+
+const state={team:"All",rep:"All",stale:14};
+
+function calc(ds,reps){
+  const quota=sum(reps.map(r=>r.quota));
+  const won=ds.filter(d=>d.status==="Won"),lost=ds.filter(d=>d.status==="Lost");
+  const cur=ds.filter(d=>d.status==="Open"&&d.qtr==="cur");
+  const nxt=ds.filter(d=>d.status==="Open"&&d.qtr==="next");
+  const closed=amt(won);
+  const commitO=amt(cur.filter(d=>d.forecast==="Commit"));
+  const bcO=amt(cur.filter(d=>d.forecast==="Best Case"));
+  const pipeO=amt(cur.filter(d=>d.forecast==="Pipeline"));
+  const stale=ds.filter(d=>d.status==="Open"&&d.updated>=state.stale);
+  return {quota,closed,commitO,bcO,
+    commit:closed+commitO,best:closed+commitO+bcO,total:closed+commitO+bcO+pipeO,
+    cur,nxt,nextPipe:amt(nxt),stale,staleAmt:amt(stale),
+    win:(won.length+lost.length)?won.length/(won.length+lost.length):0,
+    cycle:won.length?sum(won.map(d=>d.cycle))/won.length:0};
+}
+function scope(){
+  const reps=REPS.filter(r=>(state.team==="All"||r.team===state.team)&&(state.rep==="All"||r.name===state.rep));
+  const names=new Set(reps.map(r=>r.name));
+  return {reps,ds:deals.filter(d=>names.has(d.owner))};
+}
+
+/* ---------- Render ---------- */
+function renderHero(m){
+  const gap=m.quota-m.closed;
+  const quietFc=m.cur.filter(d=>d.forecast!=="Pipeline"&&d.updated>=state.stale);
+  let big,lines=[];
+  if(gap<=0){
+    big=`${fmt(-gap)} over plan<small>${pct(m.closed/m.quota)} of quota with ${DAYS_LEFT} days left</small>`;
+    lines.push(`<p>Quota is closed. Commit adds another ${fmt(m.commitO)} if it lands.</p>`);
+  }else{
+    big=`${fmt(gap)} to go<small>${DAYS_LEFT} days left in the quarter</small>`;
+    lines.push(`<p>Open commit deals cover <b>${pct(Math.min(m.commitO/gap,9.99))}</b> of the gap. If commit lands, we finish at <b>${pct(m.commit/m.quota)}</b> of plan. Pulling in best case gets us to <b>${pct(m.best/m.quota)}</b>.</p>`);
+  }
+  const shaky=m.cur.filter(d=>d.forecast==="Commit"&&HY[d.owner].score<70);
+  if(shaky.length&&m.commitO)lines.push(`<p>${fmt(amt(shaky))} of open commit (${pct(amt(shaky)/m.commitO)}) comes from reps with CRM hygiene under 70. Weigh it with caution.</p>`);
+  if(quietFc.length)lines.push(`<p class="flag">${quietFc.length} forecast deal${quietFc.length>1?"s":""} worth ${fmt(amt(quietFc))} closing this quarter ${quietFc.length>1?"haven't":"hasn't"} been updated in ${state.stale}+ days.</p>`);
+  else lines.push(`<p>Every forecast deal closing this quarter has been updated in the last ${state.stale} days.</p>`);
+  $("#heroBig").innerHTML=big;
+  $("#insight").innerHTML=lines.join("");
+
+  const rows=[["Closed won",m.closed,"--closed"],["Commit",m.commit,"--commit"],["Best case",m.best,"--best"],["All pipeline",m.total,"--pipe"]];
+  const max=Math.max(m.total,m.quota)*1.06;
+  const q=m.quota/max*100;
+  $("#ladder").innerHTML=rows.map(([l,v,c])=>`<div class="lrow"><div class="lab">${l}</div><div class="track"><div class="fill" style="width:${v/max*100}%;background:var(${c})"></div></div><div class="val">${fmt(v)}<span>${pct(v/m.quota)}</span></div></div>`).join("")
+    +`<div class="qline" style="left:calc(96px + 12px + (100% - 96px - 118px - 24px) * ${q/100})"><span class="qtag">Quota ${fmt(m.quota)}</span></div>`;
+  if(window.matchMedia("(max-width:520px)").matches){
+    $("#ladder .qline").style.left=`calc(72px + 12px + (100% - 72px - 12px) * ${q/100})`;
+  }
+}
+function renderStrip(m){
+  const cov=m.quota?m.nextPipe/m.quota:0;
+  const items=[
+    ["Closed won",fmt(m.closed),`${pct(m.closed/m.quota)} of ${fmt(m.quota)}`,tone(m.closed/m.quota,.9,.7)],
+    ["Commit",fmt(m.commit),`${pct(m.commit/m.quota)} of quota`,tone(m.commit/m.quota,1,.85)],
+    ["Next-qtr coverage",cov.toFixed(1)+"x",`${fmt(m.nextPipe)} vs 3.0x target`,tone(cov,3,2.3)],
+    ["Win rate",pct(m.win),"Deals closed this quarter",""],
+    ["Sales cycle",Math.round(m.cycle)+" days","Average for won deals",""],
+    ["Gone quiet",String(m.stale.length),`${fmt(m.staleAmt)} with no update in ${state.stale}+ days`,m.stale.length?"bad":"good"]
+  ];
+  $("#strip").innerHTML=items.map(([l,v,s,t])=>`<div class="metric"><span>${l}</span><b class="${t}">${v}</b><em>${s}</em></div>`).join("");
+}
+let charts={};
+function chart(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg)}
+function renderCharts(m){
+  if(typeof Chart==="undefined")return;
+  Chart.defaults.font.family='"Public Sans",system-ui,sans-serif';
+  Chart.defaults.color=css("--muted");
+  Chart.defaults.borderColor=css("--line");
+  const byStage=list=>STAGES.map(s=>amt(list.filter(d=>d.stage===s)));
+  chart("stageChart",{type:"bar",data:{labels:STAGES,datasets:[
+      {label:"Closing this quarter",data:byStage(m.cur),backgroundColor:css("--commit"),borderRadius:3},
+      {label:"Next quarter",data:byStage(m.nxt),backgroundColor:css("--best"),borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.raw)}}},
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}});
+
+  const teams=state.team==="All"?["Enterprise","Mid-Market"]:[state.team];
+  const colors={"Enterprise":css("--commit"),"Mid-Market":css("--gold")};
+  const teamNow=t=>{const reps=REPS.filter(r=>r.team===t);const n=new Set(reps.map(r=>r.name));return calc(deals.filter(d=>n.has(d.owner)),reps)};
+  const line=(key,fmtFn,now)=>({type:"line",data:{labels:QTRS,datasets:teams.map(t=>({label:t,data:[...HIST[t][key],now(teamNow(t))],borderColor:colors[t],backgroundColor:colors[t],tension:.3,pointRadius:3}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmtFn(c.raw)}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true}},y:{ticks:{callback:v=>fmtFn(v)}}}}});
+  chart("winChart",line("win",v=>Math.round(v*100)+"%",m2=>+m2.win.toFixed(3)));
+  chart("cycleChart",line("cycle",v=>Math.round(v)+"d",m2=>Math.round(m2.cycle)));
+}
+function renderReps(){
+  const list=REPS.filter(r=>state.team==="All"||r.team===state.team)
+    .map(r=>({r,m:calc(deals.filter(d=>d.owner===r.name),[r])}))
+    .sort((a,b)=>b.m.closed/b.m.quota-a.m.closed/a.m.quota);
+  $("#repBody").innerHTML=list.map(({r,m})=>{
+    const att=m.closed/m.quota,cov=m.nextPipe/m.quota,t=tone(att,.9,.7);
+    return `<tr class="pick${state.rep===r.name?" sel":""}" tabindex="0" data-rep="${r.name}">
+      <td><b>${r.name}</b></td><td>${r.team}</td><td class="r">${fmt(r.quota)}</td><td class="r">${fmt(m.closed)}</td>
+      <td><div class="att"><div class="bar"><i style="width:${Math.min(att,1)*100}%;background:var(--${t})"></i></div><span class="${t}">${pct(att)}</span></div></td>
+      <td class="r">${pct(m.commit/m.quota)}</td><td class="r ${tone(cov,3,2.3)}">${cov.toFixed(1)}x</td>
+      <td class="r">${pct(m.win)}</td><td class="r ${m.stale.length>2?"bad":""}">${m.stale.length}</td>
+      <td><span class="badge ${hyStatus(HY[r.name].score)[0]}">${HY[r.name].score}</span></td></tr>`;
+  }).join("");
+  renderHygiene();renderAI();
+  document.querySelectorAll("#repBody tr, #hyBody tr, #aiBody tr").forEach(tr=>{
+    const go=()=>{state.rep=state.rep===tr.dataset.rep?"All":tr.dataset.rep;fillReps();render();};
+    tr.addEventListener("click",go);
+    tr.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}});
+  });
+}
+function renderHygiene(){
+  const list=REPS.filter(r=>state.team==="All"||r.team===state.team).map(r=>({r,h:HY[r.name]})).sort((a,b)=>b.h.score-a.h.score);
+  const top=list[0],low=list[list.length-1];
+  const issues=h=>[h.pastClose&&`${h.pastClose} deal${h.pastClose>1?"s":""} with close dates already passed`,h.noNext&&`${h.noNext} without a next step`,h.pushed&&`${h.pushed} pushed twice or more`].filter(Boolean);
+  const li=issues(low.h);
+  $("#hyHero").innerHTML=`<p><b>CRM hero:</b> ${top.r.name}, scoring ${top.h.score}. Their forecast is the one to trust.</p>`+
+    (low.h.score<70?`<p><b>Needs the most time in the CRM:</b> ${low.r.name}, scoring ${low.h.score}${li.length?", with "+li.join(", "):""}.</p>`:`<p>Everyone on this team is at 70 or above.</p>`);
+  const cell=v=>`<td class="r ${tone(v,.85,.7)}">${pct(v)}</td>`;
+  $("#hyBody").innerHTML=list.map(({r,h})=>{const [c,l]=hyStatus(h.score),t=tone(h.score/100,.85,.7);
+    return `<tr class="pick${state.rep===r.name?" sel":""}" tabindex="0" data-rep="${r.name}"><td><b>${r.name}</b></td>
+      <td><div class="att"><div class="bar"><i style="width:${h.score}%;background:var(--${t})"></i></div><span class="${t}">${h.score}</span></div></td>
+      ${cell(h.p.fresh)}${cell(h.p.next)}${cell(h.p.close)}${cell(h.p.push)}${cell(h.p.med)}
+      <td><span class="badge ${c}">${l}</span></td></tr>`;}).join("");
+}
+function renderAI(){
+  const {ds,reps}=scope();
+  const S=aiSplit(ds),A=S.ai,N=S.no;
+  const adopt=reps.length?reps.reduce((x,r)=>x+ADOPT[r.name],0)/reps.length:0;
+  const winLift=A.win-N.win,sizeLift=N.size?A.size/N.size-1:0,cycDiff=A.cyc-N.cyc;
+  const sign=v=>v>=0?"+":"−";
+  $("#aistrip").innerHTML=[
+    ["Seller adoption",pct(adopt),"Average weekly active use",tone(adopt,.7,.4)],
+    ["AI-assisted deals",pct(S.share),`${A.n} of ${ds.length} deals`,""],
+    ["Win rate lift",`${sign(winLift)}${Math.abs(Math.round(winLift*100))} pts`,`${pct(A.win)} AI-assisted vs ${pct(N.win)} without`,winLift>0?"good":"bad"],
+    ["Won deal size",`${sign(sizeLift)}${Math.abs(Math.round(sizeLift*100))}%`,`${fmt(A.size)} vs ${fmt(N.size)} average`,sizeLift>0?"good":"bad"],
+    ["Sales cycle",`${sign(cycDiff)}${Math.abs(Math.round(cycDiff))} days`,`${Math.round(A.cyc)} vs ${Math.round(N.cyc)} days to close`,cycDiff<0?"good":"bad"]
+  ].map(([l,v,s2,t])=>`<div class="metric"><span>${l}</span><b class="${t}">${v}</b><em>${s2}</em></div>`).join("");
+
+  const big=ds.filter(d=>d.amount>MEDIAN[d.team]),small=ds.filter(d=>d.amount<=MEDIAN[d.team]);
+  const sh=a=>a.length?a.filter(d=>d.ai).length/a.length:0;
+  const smallN=A.nc<15||N.nc<15;
+  $("#aiRead").innerHTML=`<p><b>Reading this honestly:</b> AI-assisted deals look better, but part of that is selection. Reps reach for AI on their biggest deals: ${pct(sh(big))} of above-median deals are AI-assisted vs ${pct(sh(small))} of smaller ones. That alone inflates deal size.</p>
+    <p><b>How to prove it:</b> give guided selling to a random half of one team for a quarter and compare against the other half, or compare deals matched on size and stage.${smallN?" At this scope the closed-deal sample is small, so treat the lift as directional.":""}</p>`;
+
+  if(typeof Chart!=="undefined"){
+    const teams=state.team==="All"?TEAMS:[state.team];
+    const col={"Enterprise":css("--commit"),"Mid-Market":css("--gold")};
+    const wk=Array.from({length:12},(_,i)=>"Wk "+(i+1));
+    chart("aiTrend",{type:"line",data:{labels:wk,datasets:teams.map(t=>{
+        const rs=REPS.filter(r=>r.team===t),a=rs.reduce((x,r)=>x+ADOPT[r.name],0)/rs.length;
+        const f=w=>1/(1+Math.exp(-(w-4.5)/1.5)),top=f(12);
+        return {label:t,data:wk.map((_,i)=>+(a*f(i+1)/top).toFixed(3)),borderColor:col[t],backgroundColor:col[t],tension:.3,pointRadius:2};})},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+pct(c.raw)}}},
+        scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true}},y:{min:0,max:1,ticks:{callback:v=>Math.round(v*100)+"%"}}}}});
+    const pts=REPS.filter(r=>state.team==="All"||r.team===state.team).map(r=>{const m=calc(deals.filter(d=>d.owner===r.name),[r]);return {r,x:Math.round(ADOPT[r.name]*100),y:Math.round(m.closed/m.quota*100)};});
+    const guide=(data)=>({type:"line",label:"guide",data,borderColor:css("--muted"),borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false});
+    chart("aiMap",{type:"scatter",data:{datasets:[
+        ...teams.map(t=>({label:t,data:pts.filter(p=>p.r.team===t).map(p=>({x:p.x,y:p.y,name:p.r.name})),
+          backgroundColor:col[t],pointRadius:pts.map(p=>p.r.name===state.rep?9:6).filter((_,i)=>pts[i].r.team===t),pointHoverRadius:9})),
+        guide([{x:50,y:30},{x:50,y:115}]),guide([{x:0,y:80},{x:100,y:80}])]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10,filter:i=>i.text!=="guide"}},
+          tooltip:{filter:i=>i.dataset.label!=="guide",callbacks:{label:c=>`${c.raw.name}: ${c.raw.x}% use, ${c.raw.y}% attainment`}}},
+        scales:{x:{min:0,max:100,title:{display:true,text:"Weekly AI use"},ticks:{callback:v=>v+"%"}},y:{min:30,max:115,title:{display:true,text:"Attainment"},ticks:{callback:v=>v+"%"}}}}});
+  }
+
+  const move=(a,att)=>a>=.7?(att>=.9?"Make them a peer coach and record their workflow":"Using it but not converting; review deal strategy in 1:1s")
+    :a<.4?(att>=.8?"Winning without it; show time saved, don't force it":"Hands-on enablement, starting with meeting prep")
+    :"Build AI account plans for their top 3 open deals";
+  $("#aiBody").innerHTML=REPS.filter(r=>state.team==="All"||r.team===state.team).map(r=>{
+    const a=ADOPT[r.name],mine=deals.filter(d=>d.owner===r.name),m=calc(mine,[r]),att=m.closed/m.quota,[c,l]=aiStage(a),h=HY[r.name].score;
+    const op=mine.filter(d=>d.status==="Open");
+    return {r,a,html:`<tr class="pick${state.rep===r.name?" sel":""}" tabindex="0" data-rep="${r.name}"><td><b>${r.name}</b></td>
+      <td class="r ${tone(a,.7,.4)}">${pct(a)}</td><td class="r">${pct(op.length?op.filter(d=>d.ai).length/op.length:0)}</td><td class="r">${PREPS[r.name]}</td>
+      <td class="r ${tone(att,.9,.7)}">${pct(att)}</td><td class="r ${tone(h/100,.85,.7)}">${h}</td>
+      <td><span class="badge ${c}">${l}</span></td><td>${move(a,att)}</td></tr>`};
+  }).sort((x,y)=>y.a-x.a).map(o=>o.html).join("");
+}
+function renderPartners(){
+  const {ds}=scope();
+  const P=ds.filter(d=>d.partner),D=ds.filter(d=>!d.partner);
+  const open=P.filter(d=>d.status==="Open"),allOpen=ds.filter(d=>d.status==="Open");
+  const curFc=open.filter(d=>d.qtr==="cur"&&d.forecast!=="Pipeline");
+  const hs=open.filter(d=>d.hs),burn=open.filter(d=>d.commitBurn),pend=open.filter(d=>!d.registered);
+  const oA=amt(open);
+  $("#pstrip").innerHTML=[
+    ["Open partner pipeline",fmt(oA),`${open.length} deals, ${pct(amt(allOpen)?oA/amt(allOpen):0)} of all open pipeline`],
+    ["Closing this quarter",fmt(amt(curFc)),"Partner deals in commit or best case"],
+    ["Hyperscaler co-sell",fmt(amt(hs)),`${pct(oA?amt(hs)/oA:0)} of partner pipeline`],
+    ["Counts toward cloud commit",fmt(amt(burn)),"Buyer can pay from committed cloud spend"],
+    ["Won this quarter",fmt(amt(P.filter(d=>d.status==="Won"))),`${P.filter(d=>d.status==="Won").length} partner deals closed`]
+  ].map(([l,v,s2])=>`<div class="metric"><span>${l}</span><b>${v}</b><em>${s2}</em></div>`).join("");
+  const lines=[];
+  if(burn.length)lines.push(`<p><b>Cloud commit angle:</b> ${fmt(amt(burn))} of partner pipeline can be paid from the buyer's committed AWS, Azure, or Google Cloud spend. That money is already budgeted, so these deals tend to clear procurement faster.</p>`);
+  if(pend.length)lines.push(`<p class="flag">${pend.length} open partner deal${pend.length>1?"s":""} worth ${fmt(amt(pend))} ${pend.length>1?"are":"is"} still pending registration. Get ${pend.length>1?"them":"it"} approved so the partner's field team engages.</p>`);
+  if(!open.length)lines.push(`<p>No open partner deals in this view.</p>`);
+  $("#pRead").innerHTML=lines.join("");
+
+  if(typeof Chart!=="undefined"){
+    const names=[...new Set(PARTNERS.map(p=>p.partner))].map(nm=>({nm,v:amt(open.filter(d=>d.partner===nm))})).sort((a,b)=>b.v-a.v);
+    const col={"Co-sell":css("--commit"),"Marketplace":css("--gold"),"SI referral":css("--best")};
+    chart("pChart",{type:"bar",data:{labels:names.map(x=>x.nm),datasets:["Co-sell","Marketplace","SI referral"].map(mo=>({label:mo,backgroundColor:col[mo],borderRadius:3,
+        data:names.map(x=>amt(open.filter(d=>d.partner===x.nm&&d.motion===mo)))}))},
+      options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.raw)}}},
+        scales:{x:{stacked:true,ticks:{callback:v=>fmt(v)}},y:{stacked:true,grid:{display:false}}}}});
+  }
+
+  const st=a=>{const c=a.filter(d=>d.status!=="Open"),w=a.filter(d=>d.status==="Won"),o=a.filter(d=>d.status==="Open");
+    return {win:c.length?w.length/c.length:0,nc:c.length,size:w.length?amt(w)/w.length:0,cyc:w.length?w.reduce((x,d)=>x+d.cycle,0)/w.length:0,osize:o.length?amt(o)/o.length:0};};
+  const p=st(P),d=st(D),few=p.nc<10;
+  $("#pVs").innerHTML=[
+    ["Win rate",`${pct(p.win)}<span class="nn">${p.nc} closed${few?", small sample":""}</span>`,`${pct(d.win)}<span class="nn">${d.nc} closed</span>`],
+    ["Average won deal",fmt(p.size),fmt(d.size)],
+    ["Days to close",Math.round(p.cyc),Math.round(d.cyc)],
+    ["Average open deal",fmt(p.osize),fmt(d.osize)]
+  ].map(r=>`<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td></tr>`).join("");
+
+  $("#pScore").innerHTML=PARTNERS.map(pp=>{
+    const a=P.filter(x=>x.partner===pp.partner&&x.motion===pp.motion),o=a.filter(x=>x.status==="Open");
+    return {pp,v:amt(o),html:`<tr><td><b>${pp.partner}</b></td><td>${pp.motion}</td><td class="r">${fmt(amt(o))}</td><td class="r">${o.length}</td>
+      <td class="r">${fmt(amt(o.filter(x=>x.qtr==="cur")))}</td><td class="r">${fmt(amt(a.filter(x=>x.status==="Won")))}</td>
+      <td class="r ${o.some(x=>!x.registered)?"warn":""}">${o.filter(x=>!x.registered).length}</td><td class="r">${fmt(amt(o.filter(x=>x.commitBurn)))}</td></tr>`};
+  }).sort((a,b)=>b.v-a.v).map(x=>x.html).join("");
+
+  const top=[...open].sort((a,b)=>b.amount-a.amount).slice(0,15);
+  $("#pDealsTitle").textContent=`Open partner deals (${open.length}, ${fmt(oA)})`;
+  $("#pDeals").innerHTML=top.length?top.map(x=>`<tr><td><b>${x.account}</b></td><td>${x.partner}</td><td>${x.motion}</td><td>${x.owner}</td><td>${x.stage}</td><td>${x.forecast}</td>
+    <td class="r">${fmt(x.amount)}</td><td>${fdate(x.close)}</td><td><span class="badge ${x.registered?"hero":"med"}">${x.registered?"Approved":"Pending"}</span></td><td>${x.commitBurn?"Yes":"–"}</td></tr>`).join("")
+    :`<tr><td colspan="10" class="empty">No open partner deals for this selection. Choose All reps to see the full partner book.</td></tr>`;
+}
+function renderQuiet(m){
+  const ranked=m.stale.map(d=>{
+    const hot=d.qtr==="cur"&&d.forecast!=="Pipeline";
+    return {d,hot,score:d.amount*(d.updated/30)*(hot?3:d.qtr==="cur"?2:1)};
+  }).sort((a,b)=>b.score-a.score).slice(0,12);
+  $("#quietTitle").textContent=`Deals gone quiet (${m.stale.length})`;
+  if(!ranked.length){$("#quietBody").innerHTML=`<tr><td colspan="9" class="empty">No open deals past ${state.stale} days without an update. Try a shorter threshold.</td></tr>`;return;}
+  $("#quietBody").innerHTML=ranked.map(({d,hot})=>{
+    const high=hot||d.updated>=30;
+    return `<tr><td><b>${d.account}</b></td><td>${d.owner}</td><td>${d.stage}</td><td>${d.forecast}</td><td class="r">${fmt(d.amount)}</td>
+      <td>${fdate(d.close)}</td><td class="r ${d.updated>=30?"bad":"warn"}">${d.updated}</td><td class="r">${d.inStage}</td>
+      <td><span class="badge ${high?"high":"med"}">${high?"High":"Medium"}</span></td></tr>`;
+  }).join("");
+}
+function renderDemand(){
+  const rows=demand();
+  const S=(a,k)=>sum(a.map(r=>r[k]));
+  const inb=rows.filter(r=>!r.out),outb=rows.filter(r=>r.out);
+  const spend=S(rows,"spend"),pipe=S(rows,"pipe"),won=S(rows,"won"),wonN=S(rows,"wonN"),leads=S(rows,"leads");
+  const mktPipe=S(inb,"pipe"),inLeads=S(inb,"leads");
+  const ret=spend?won/spend:0;
+  $("#dstrip").innerHTML=[
+    ["Marketing-sourced pipeline",pct(pipe?mktPipe/pipe:0),`${fmt(mktPipe)} of ${fmt(pipe)} created`,""],
+    ["Program CAC",fmt(wonN?spend/wonN:0),`${fmt(spend)} spend, ${wonN} customers won`,""],
+    ["Cost per inbound lead",fmt(inLeads?S(inb,"spend")/inLeads:0),`${n(inLeads)} inbound and event leads`,""],
+    ["Lead to customer",(leads?wonN/leads*100:0).toFixed(1)+"%",`${n(leads)} leads, ${wonN} won`,""],
+    ["Return on spend",ret.toFixed(1)+"x","Closed-won revenue per $1 spent",tone(ret,3,1.5)]
+  ].map(([l,v,s,t])=>`<div class="metric"><span>${l}</span><b class="${t}">${v}</b><em>${s}</em></div>`).join("");
+
+  const step=(v,l)=>`<div class="step"><b>${n(v)}</b><span>${l}</span></div>`;
+  const conv=(a,b)=>`<div class="conv">${a?pct(b/a):""}</div>`;
+  const I={l:inLeads,m:S(inb,"mql"),s:S(inb,"sql"),o:S(inb,"opps"),w:S(inb,"wonN")};
+  const O={l:S(outb,"leads"),s:S(outb,"sql"),o:S(outb,"opps"),w:S(outb,"wonN")};
+  $("#funnels").innerHTML=
+    `<div class="funnel"><div class="fname">Inbound and events</div><div class="steps">${step(I.l,"Leads")}${conv(I.l,I.m)}${step(I.m,"MQLs")}${conv(I.m,I.s)}${step(I.s,"SQLs")}${conv(I.s,I.o)}${step(I.o,"Opportunities")}${conv(I.o,I.w)}${step(I.w,"Won")}</div></div>`+
+    `<div class="funnel"><div class="fname">Outbound</div><div class="steps">${step(O.l,"Prospects engaged")}<div class="conv"></div><div class="step skip"><b>–</b><span>No MQL stage</span></div>${conv(O.l,O.s)}${step(O.s,"SQLs")}${conv(O.s,O.o)}${step(O.o,"Opportunities")}${conv(O.o,O.w)}${step(O.w,"Won")}</div></div>`;
+
+  if(typeof Chart!=="undefined"){
+    const byVal=[...rows].sort((a,b)=>(b.won+b.open)-(a.won+a.open));
+    chart("sourceChart",{type:"bar",data:{labels:byVal.map(r=>r.key),datasets:[
+        {label:"Closed won",data:byVal.map(r=>r.won),backgroundColor:css("--closed"),borderRadius:3},
+        {label:"Open pipeline",data:byVal.map(r=>r.open),backgroundColor:css("--best"),borderRadius:3}]},
+      options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.raw)}}},
+        scales:{x:{stacked:true,ticks:{callback:v=>fmt(v)}},y:{stacked:true,grid:{display:false}}}}});
+  }
+
+  const row=r=>{const rr=r.spend?r.won/r.spend:0;return `<td><b>${r.key}</b></td><td>${r.type}</td><td class="r">${fmt(r.spend)}</td><td class="r">${n(r.leads)}</td><td class="r">${r.out?"–":n(r.mql)}</td><td class="r">${n(r.sql)}</td><td class="r">${n(r.opps)}</td><td class="r">${fmt(r.pipe)}</td><td class="r">${fmt(r.won)}</td><td class="r">${r.leads?fmt(r.spend/r.leads):"–"}</td><td class="r">${r.opps?fmt(r.spend/r.opps):"–"}</td><td class="r">${r.wonN?fmt(r.spend/r.wonN):"–"}</td><td class="r ${tone(rr,3,1.5)}">${rr.toFixed(1)}x</td>`;};
+  const tot={key:"All sources",type:"",out:false,spend,leads,mql:S(rows,"mql"),sql:S(rows,"sql"),opps:S(rows,"opps"),pipe,won,wonN};
+  $("#srcBody").innerHTML=[...rows].sort((a,b)=>b.pipe-a.pipe).map(r=>`<tr>${row(r)}</tr>`).join("")+`<tr class="tot">${row(tot)}</tr>`;
+  renderInfluence();
+}
+function renderInfluence(){
+  const I=influence();
+  const lift=I.wA.r-I.wN.r;
+  $("#istrip").innerHTML=[
+    ["Deals influenced by marketing",pct(I.ds.length?I.any.length/I.ds.length:0),`${I.any.length} of ${I.ds.length} deals had a touch after opening`,""],
+    ["Influenced pipeline",fmt(amt(I.any)),`${fmt(amt(I.any.filter(d=>d.status==="Won")))} of it already closed won`,""],
+    ["Win rate with a touch",pct(I.wA.r),`vs ${pct(I.wN.r)} with no marketing touch`,lift>0?"good":"bad"]
+  ].map(([l,v,s,t])=>`<div class="metric"><span>${l}</span><b class="${t}">${v}</b><em>${s}</em></div>`).join("");
+
+  if(typeof Chart!=="undefined"){
+    const r=[...I.rows].sort((a,b)=>(b.sourced+b.inf)-(a.sourced+a.inf));
+    chart("infChart",{type:"bar",data:{labels:r.map(x=>x.key),datasets:[
+        {label:"Sourced",data:r.map(x=>x.sourced),backgroundColor:css("--commit"),borderRadius:3},
+        {label:"Influenced",data:r.map(x=>x.inf),backgroundColor:css("--gold"),borderRadius:3}]},
+      options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.raw)}}},
+        scales:{x:{ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}}});
+  }
+  $("#infBody").innerHTML=[...I.rows].sort((a,b)=>b.inf-a.inf).map(r=>{
+    const l=r.t.r-r.u.r,small=r.t.n<10;
+    return `<tr><td><b>${r.key}</b></td><td class="r">${fmt(r.sourced)}</td><td class="r">${r.infN}</td><td class="r">${fmt(r.inf)}</td><td class="r">${fmt(r.infWon)}</td>
+      <td class="r">${pct(r.t.r)}<span class="nn">${r.t.n} closed</span></td><td class="r">${pct(r.u.r)}</td>
+      <td class="r ${small?"":l>0?"good":"bad"}">${l>=0?"+":""}${Math.round(l*100)} pts${small?'<span class="nn">small sample</span>':""}</td></tr>`;
+  }).join("");
+}
+function render(){
+  const {ds,reps}=scope();
+  const m=calc(ds,reps);
+  renderHero(m);renderStrip(m);renderCharts(m);renderDemand();renderPartners();renderReps();renderQuiet(m);
+}
+
+/* ---------- Controls ---------- */
+function fillReps(){
+  const list=REPS.filter(r=>state.team==="All"||r.team===state.team);
+  $("#rep").innerHTML=`<option value="All">All reps</option>`+list.map(r=>`<option value="${r.name}"${r.name===state.rep?" selected":""}>${r.name}</option>`).join("");
+}
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{
+  state.team=b.dataset.team;state.rep="All";
+  document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));
+  fillReps();render();
+}));
+$("#rep").addEventListener("change",e=>{state.rep=e.target.value;render();});
+$("#stale").addEventListener("change",e=>{state.stale=+e.target.value;render();});
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);}catch(e){}
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{const {ds,reps}=scope();renderHero(calc(ds,reps));},150);});
+
+const TABS=["forecast","team","pipeline","demand","partners","ai"];
+function showTab(t,focus){
+  TABS.forEach(x=>{const on=x===t,b=$("#t-"+x);b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;$("#tab-"+x).hidden=!on;});
+  if(focus)$("#t-"+t).focus();
+  try{history.replaceState(null,"","#"+t);}catch(e){}
+  render();
+}
+TABS.forEach((t,i)=>{
+  const b=$("#t-"+t);
+  b.addEventListener("click",()=>showTab(t));
+  b.addEventListener("keydown",e=>{
+    let j=null;if(e.key==="ArrowRight")j=(i+1)%TABS.length;if(e.key==="ArrowLeft")j=(i+TABS.length-1)%TABS.length;
+    if(e.key==="Home")j=0;if(e.key==="End")j=TABS.length-1;
+    if(j!==null){e.preventDefault();showTab(TABS[j],true);}
+  });
+});
+$("#infToggle").addEventListener("click",e=>{
+  const b=e.currentTarget,w=$("#infWrap"),open=w.hidden;
+  w.hidden=!open;b.setAttribute("aria-expanded",open?"true":"false");
+  b.querySelector(".lbl").textContent=open?"Hide sourced vs influenced":"Show sourced vs influenced";
+  if(open)renderInfluence();
+});
+fillReps();
+const startTab=(location.hash||"").slice(1);
+showTab(TABS.includes(startTab)?startTab:"forecast");
+</script>
+</body>
+</html>
