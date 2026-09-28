@@ -619,7 +619,7 @@ function renderCharts(m){
   const colors={"Enterprise":css("--commit"),"Mid-Market":css("--gold")};
   const teamNow=t=>{const reps=REPS.filter(r=>r.team===t);const n=new Set(reps.map(r=>r.name));return calc(deals.filter(d=>n.has(d.owner)),reps)};
   const line=(key,fmtFn,now)=>({type:"line",data:{labels:QTRS,datasets:teams.map(t=>({label:t,data:[...HIST[t][key],now(teamNow(t))],borderColor:colors[t],backgroundColor:colors[t],tension:.3,pointRadius:3}))},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmtFn(c.raw)}}},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{right:14}},plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmtFn(c.raw)}}},
       scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true}},y:{ticks:{callback:v=>fmtFn(v)}}}}});
   chart("winChart",line("win",v=>Math.round(v*100)+"%",m2=>+m2.win.toFixed(3)));
   chart("cycleChart",line("cycle",v=>Math.round(v)+"d",m2=>Math.round(m2.cycle)));
